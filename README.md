@@ -128,6 +128,99 @@ The backend runs **two servers**: the REST API and a separate Socket.IO server.
 
 ---
 
+# JUnit + Mockito Test Suite
+
+## Added Tests
+
+| Test Class | Purpose |
+|------------|---------|
+| BloodCompatTest | Blood compatibility validation |
+| TokensTest | Token generation & hashing |
+| JwtUtilTest | JWT validation |
+| AiServiceTest | AI fallback behavior |
+| AuthControllerTest | Register/Login flows |
+| DonorControllerTest | Leaderboard & nearby donor logic |
+
+## Run Tests
+
+```bash
+mvn test
+```
+
+Expected:
+
+```text
+BUILD SUCCESS
+Tests run: 31
+Failures: 0
+```
+
+---
+
+# Docker Support
+
+## Run Entire Stack
+
+```bash
+docker compose up --build
+```
+
+Services:
+- Spring Boot Backend
+- PostgreSQL
+- Redis
+
+Stop:
+
+```bash
+docker compose down
+```
+
+Remove volumes:
+
+```bash
+docker compose down -v
+```
+
+Build backend image only:
+
+```bash
+docker build -t bloodconnect-backend .
+```
+
+---
+
+# Redis Caching
+
+## Cached Endpoints
+
+| Cache | TTL |
+|---------|---------|
+| leaderboard | 5 min |
+| nearbyDonors | 2 min |
+| healthTips | 1 hour |
+
+## Verify Cache
+
+```bash
+curl http://localhost:8080/api/donors/leaderboard
+```
+
+Inspect Redis:
+
+```bash
+docker exec -it bloodconnect-redis redis-cli
+KEYS *
+```
+
+Disable cache:
+
+```bash
+CACHE_TYPE=none mvn spring-boot:run
+```
+
+---
+
 ## 📋 Prerequisites
 
 Make sure these are installed:
