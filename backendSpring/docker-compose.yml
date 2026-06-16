@@ -1,0 +1,58 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: bloodconnect-postgres
+    environment:
+      POSTGRES_DB: bloodconnect
+      POSTGRES_USER: ${DB_USER:-postgres}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-postgres}
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-postgres} -d bloodconnect"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: bloodconnect-redis
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  backend:
+    build: .
+    container_name: bloodconnect-backend
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    ports:
+      - "8080:8080"   # REST API
+      - "5000:5000"   # Socket.IO
+    environment:
+      # DB + Redis point at the compose service names, not localhost.
+      DB_URL: jdbc:postgresql://postgres:5432/bloodconnect
+      DB_USER: ${DB_USER:-postgres}
+      DB_PASSWORD: ${DB_PASSWORD:-postgres}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      CACHE_TYPE: redis
+      # Secrets / config - supply these via a .env file next to this compose file.
+      JWT_SECRET: ${JWT_SECRET:-change_this_to_a_long_random_secret_string_at_least_32_chars}
+      ADMIN_SECRET: ${ADMIN_SECRET:-bloodconnect_admin_2024}
+      CLIENT_URL: ${CLIENT_URL:-http://localhost:5173}
+      GROQ_API_KEY: ${GROQ_API_KEY:-}
+      EMAIL_USER: ${EMAIL_USER:-}
+      EMAIL_PASS: ${EMAIL_PASS:-}
+
+volumes:
+  pgdata:

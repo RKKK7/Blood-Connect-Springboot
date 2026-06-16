@@ -5,6 +5,7 @@ import com.bloodconnect.model.DonorProfile;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClient;
 
@@ -113,6 +114,10 @@ public class AiService {
         }
     }
 
+    // Cached in Redis (cache "healthTips", TTL 1 hour). Health tips depend only on
+    // blood type + donation count, so identical donors reuse one Groq call instead
+    // of paying the external API latency every time.
+    @Cacheable(value = "healthTips", key = "#p.bloodType + ':' + #p.totalDonations")
     public Map<String, Object> generateHealthTip(DonorProfile p) {
         try {
             String prompt = "Generate a personalized post-donation health tip for a blood donor. Return ONLY valid JSON, no markdown.\n\n"
