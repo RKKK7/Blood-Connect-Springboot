@@ -7,6 +7,9 @@ import com.bloodconnect.repository.UserRepository;
 import com.bloodconnect.service.AiService;
 import com.bloodconnect.util.ApiException;
 import com.bloodconnect.util.Presenter;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
+import org.springframework.cache.annotation.Caching;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
@@ -42,6 +45,11 @@ public class DonorController {
     }
 
     // GET /api/donors/nearby
+    // Cached in Redis (cache "nearbyDonors", TTL 2 min). Key combines all query
+    // params so different searches don't collide. Evicted whenever a donor profile
+    // is updated or verified (see updateProfile / verify below).
+    @Cacheable(value = "nearbyDonors",
+            key = "T(java.lang.String).valueOf(#bloodType) + ':' + #lat + ':' + #lng + ':' + #radius")
     @GetMapping("/nearby")
     public List<Map<String, Object>> nearby(@RequestParam(required = false) Double lng,
                                             @RequestParam(required = false) Double lat,
@@ -71,6 +79,8 @@ public class DonorController {
     }
 
     // GET /api/donors/leaderboard
+    // Read-heavy and changes infrequently -> cached in Redis (TTL 5 min).
+    @Cacheable("leaderboard")
     @GetMapping("/leaderboard")
     public List<Map<String, Object>> leaderboard() {
         List<Map<String, Object>> out = new ArrayList<>();
@@ -92,6 +102,12 @@ public class DonorController {
     }
 
     // PUT /api/donors/profile  (upsert)
+    // A profile change can affect nearby search and leaderboard ordering,
+    // so evict both caches to avoid serving stale results.
+    @Caching(evict = {
+            @CacheEvict(value = "nearbyDonors", allEntries = true),
+            @CacheEvict(value = "leaderboard", allEntries = true)
+    })
     @PutMapping("/profile")
     public Map<String, Object> updateProfile(@AuthenticationPrincipal User user,
                                              @RequestBody Map<String, Object> b) {
@@ -141,6 +157,7 @@ public class DonorController {
     }
 
     // PUT /api/donors/:id/verify  (admin)
+    @CacheEvict(value = "nearbyDonors", allEntries = true)
     @PutMapping("/{id}/verify")
     public Map<String, Object> verify(@AuthenticationPrincipal User user, @PathVariable String id,
                                       @RequestBody Map<String, Object> b) {
